@@ -7,7 +7,7 @@
 
 namespace nl = nlohmann;
 const std::string version("1.0");
-const bool debug(true);
+const bool debug(false);
 
 box createBox(nl::json);
 
@@ -31,7 +31,9 @@ int main() {
             ps.close();
         }
     } else {
-        paths.push_back("../test.json");
+     //   paths.emplace_back("../test.json");
+     //   paths.emplace_back("../test2.json");
+        paths.emplace_back("../test3.json");
     }
 
     std::vector<box> boxs;
@@ -55,11 +57,43 @@ int main() {
         jo["paths"].push_back(item);
     }
 
-    for (const auto &item : boxs) {
-        jo["shapes"].push_back({item.start.x, item.start.y, item.start.z, item.end.x, item.end.y, item.end.z});
+    std::vector<box> outboxs;
+
+    for (int i = 0; i < boxs.size(); ++i) {
+        bool nflag = false;
+        for (int k = 0; k < boxs.size(); ++k) {
+            if (i != k) {
+                vec3 st = boxs[i].start;
+                vec3 en = boxs[i].end;
+                double sx = st.x;
+                double sy = st.y;
+                double sz = st.z;
+                double ex = en.x;
+                double ey = en.y;
+                double ez = en.z;
+
+                vec3 kst = boxs[k].start;
+                vec3 ken = boxs[k].end;
+                double ksx = kst.x;
+                double ksy = kst.y;
+                double ksz = kst.z;
+                double kex = ken.x;
+                double key = ken.y;
+                double kez = ken.z;
+
+                if (sx >= ksx && ex <= kex && sy >= ksy && ey <= key && sz >= ksz && ez <= kez) {
+                    nflag = true;
+                    break;
+                }
+            }
+        }
+        if (!nflag)
+            outboxs.push_back(boxs[i]);
     }
 
-    std::cout << "1" << std::endl;
+    for (const auto &item : outboxs) {
+        jo["shapes"].push_back({item.start.x, item.start.y, item.start.z, item.end.x, item.end.y, item.end.z});
+    }
 
     std::string op = "./output_shapes.json";
     if (debug) {
