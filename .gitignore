@@ -33,4 +33,4 @@
 
 *.idea
 *cmake-build-debug
-json.hpp
+output_shapes.json

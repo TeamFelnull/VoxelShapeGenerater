@@ -7,26 +7,33 @@
 
 namespace nl = nlohmann;
 const std::string version("1.0");
+const bool debug(true);
 
 box createBox(nl::json);
 
 int main() {
+
     std::cout << "VoxelShapeGenerater V" + version << std::endl;
     std::vector<std::string> paths;
-    int mc = 1;
-    while (true) {
-        std::string path;
-        std::cout << "ModelPath(" << mc << ") = ";
-        std::cin >> path;
-        std::ifstream ps(path);
-        ++mc;
-        if (!ps.is_open()) {
+    if (!debug) {
+        int mc = 1;
+        while (true) {
+            std::string path;
+            std::cout << "ModelPath(" << mc << ") = ";
+            std::cin >> path;
+            std::ifstream ps(path);
+            ++mc;
+            if (!ps.is_open()) {
+                ps.close();
+                break;
+            }
+            paths.push_back(path);
             ps.close();
-            break;
         }
-        paths.push_back(path);
-        ps.close();
+    } else {
+        paths.push_back("../test.json");
     }
+
     std::vector<box> boxs;
     for (const auto &item : paths) {
         std::ifstream js(item);
@@ -54,7 +61,11 @@ int main() {
 
     std::cout << "1" << std::endl;
 
-    std::ofstream o("./output_shapes.json");
+    std::string op = "./output_shapes.json";
+    if (debug) {
+        op = "." + op;
+    }
+    std::ofstream o(op);
     o << jo << std::endl;
 
     return 0;
