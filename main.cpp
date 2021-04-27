@@ -1,29 +1,35 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-#include "json.hpp"
-#include "shape.h"
 #include  <ctime>
 #include <cmath>
+#include <algorithm>
+#include "json.hpp"
+#include "shape.h"
+#include "ikenai_lib.hpp"
 
 namespace nl = nlohmann;
 namespace sh = shape;
+namespace ike = ikenai;
 
 const std::string version("1.0");
 const bool debug(true);
 const double oneradian(M_PI / 180);
 const double onepixel(1);
 
-sh::box createBox(nl::json);
+inline sh::box create_box(nl::json);
 
-sh::anglebox createBoxAngled(nl::json);
+inline sh::anglebox create_box_angled(nl::json);
 
-std::vector<sh::box> getBoxsByAngled(sh::anglebox anglebox);
+inline std::vector<sh::box> get_boxs_angled(sh::anglebox anglebox);
 
-void printProgress(int cont, int max, const std::string &log);
+inline void print_progress(int cont, int max, const std::string &log);
+
+inline std::vector<sh::box> optimisation_boxs(std::vector<sh::box> boxs);
 
 int main() {
 
+    clock_t st_time = clock();
 
     std::cout << "VoxelShapeGenerater V" + version << std::endl;
     std::vector<std::string> paths;
@@ -61,14 +67,14 @@ int main() {
             int cont = 0;
             for (const auto &elem : ji["elements"]) {
                 cont++;
-                printProgress(cont, ji["elements"].size(), "Model Extracting: " + item);
+                print_progress(cont, ji["elements"].size(), "Model Extracting: " + item);
 
                 nl::json el = elem;
                 bool jr = el["rotation"].is_null();
                 if (!jr) {
-                    angleboxs.push_back(createBoxAngled(elem));
+                    angleboxs.push_back(create_box_angled(elem));
                 } else {
-                    boxs.push_back(createBox(elem));
+                    boxs.push_back(create_box(elem));
                 }
             }
             std::cout << std::endl;
@@ -76,8 +82,8 @@ int main() {
                 cont = 0;
                 for (const auto &ag : angleboxs) {
                     cont++;
-                    printProgress(cont, angleboxs.size(), "Model Angle Calculating: " + item);
-                    for (const auto &abox : getBoxsByAngled(ag)) {
+                    print_progress(cont, angleboxs.size(), "Model Angle Calculating: " + item);
+                    for (const auto &abox : get_boxs_angled(ag)) {
                         boxs.push_back(abox);
                     }
                 }
@@ -90,7 +96,7 @@ int main() {
     int cont = 0;
     for (const auto &item : boxs) {
         cont++;
-        printProgress(cont, boxs.size(), "Shape Checking");
+        print_progress(cont, boxs.size(), "Shape Checking");
         sh::vec3 st = item.start;
         sh::vec3 en = item.end;
         double sx = st.x;
@@ -158,8 +164,8 @@ int main() {
     }
     std::ofstream o(op);
     o << jo << std::endl;
-
-    std::cout << "Voxel shape generate Succses full" << std::endl;
+    clock_t en_time = clock();
+    std::cout << "Voxel shape generate Succses full :" << en_time - st_time << "ms" << std::endl;
 
     if (!debug) {
         system("pause");
@@ -167,11 +173,11 @@ int main() {
     return 0;
 }
 
-sh::box createBox(nl::json json) {
+inline sh::box create_box(nl::json json) {
     return {json["from"][0], json["from"][1], json["from"][2], json["to"][0], json["to"][1], json["to"][2]};
 }
 
-sh::anglebox createBoxAngled(nl::json json) {
+inline sh::anglebox create_box_angled(nl::json json) {
     sh::axis ax = sh::X;
     if (json["rotation"]["axis"] == "y") {
         ax = sh::Y;
@@ -186,7 +192,7 @@ sh::anglebox createBoxAngled(nl::json json) {
 
 }
 
-std::vector<sh::box> getBoxsByAngled(sh::anglebox anglebox) {
+inline std::vector<sh::box> get_boxs_angled(sh::anglebox anglebox) {
     std::vector<sh::box> boxs;
     double w = anglebox.end.x - anglebox.start.x;
     double h = anglebox.end.y - anglebox.start.y;
@@ -211,7 +217,48 @@ std::vector<sh::box> getBoxsByAngled(sh::anglebox anglebox) {
     return boxs;
 }
 
-void printProgress(int cont, int max, const std::string &log) {
+inline void print_progress(int cont, int max, const std::string &log) {
     int progress = (int) (((double) cont / (double) max) * 100);
     std::cout << "\r" << "[" << progress << "%" << cont << "/" << max << "]" << log;
+}
+
+inline std::vector<sh::box> optimisation_boxs(std::vector<sh::box> boxs) {
+    std::vector<sh::box> out_boxs;
+    std::vector<int> remove_boxs;
+
+    for (int i = 0; i < boxs.size(); ++i) {
+        for (int k = 0; k < boxs.size(); ++k) {
+            if (i != k && !ike::vector_contains(remove_boxs, k)) {
+                sh::vec3 st = boxs[i].start;
+                sh::vec3 en = boxs[i].end;
+                double sx = st.x;
+                double sy = st.y;
+                double sz = st.z;
+                double ex = en.x;
+                double ey = en.y;
+                double ez = en.z;
+
+                sh::vec3 kst = boxs[k].start;
+                sh::vec3 ken = boxs[k].end;
+                double ksx = kst.x;
+                double ksy = kst.y;
+                double ksz = kst.z;
+                double kex = ken.x;
+                double key = ken.y;
+                double kez = ken.z;
+                if (sx >= ksx && ex <= kex && sy >= ksy && ey <= key && sz >= ksz && ez <= kez) {
+                    remove_boxs.push_back(k);
+                    break;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < boxs.size(); ++i) {
+        if (!ike::vector_contains(remove_boxs, i)) {
+            out_boxs.push_back(boxs[i]);
+        }
+    }
+    std::vector<int>().swap(remove_boxs);
+    return out_boxs;
 }

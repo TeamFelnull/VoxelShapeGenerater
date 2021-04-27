@@ -3,4 +3,4 @@ project(VoxelShapeGenerater)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(VoxelShapeGenerater main.cpp shape.h json.hpp OBJ_Loader.h)
+add_executable(VoxelShapeGenerater main.cpp shape.h json.hpp OBJ_Loader.h ikenai_lib.hpp)
