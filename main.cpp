@@ -13,7 +13,7 @@ namespace sh = shape;
 namespace ike = ikenai;
 
 const std::string version("1.0");
-const bool debug(true);
+const bool debug(false);
 const double oneradian(M_PI / 180);
 const double onepixel(1);
 
@@ -52,8 +52,8 @@ int main() {
         //  paths.emplace_back("../test.json");
         //  paths.emplace_back("../test2.json");
         //  paths.emplace_back("../test3.json");
-        paths.emplace_back("../test4.json");
-        //  paths.emplace_back("../testmodel.json");
+        //  paths.emplace_back("../test4.json");
+        paths.emplace_back("../testmodel.json");
     }
 
     std::vector<sh::box> boxs;
@@ -67,11 +67,11 @@ int main() {
             int cont = 0;
             for (const auto &elem : ji["elements"]) {
                 cont++;
-                print_progress(cont, ji["elements"].size(), "Model Extracting: " + item);
+                print_progress(cont, ji["elements"].size(), "Model Extracting...: " + item);
 
                 nl::json el = elem;
                 bool jr = el["rotation"].is_null();
-                if (!jr) {
+                if (!jr && el["rotation"]["angle"] != 0) {
                     angleboxs.push_back(create_box_angled(elem));
                 } else {
                     boxs.push_back(create_box(elem));
@@ -96,7 +96,7 @@ int main() {
     int cont = 0;
     for (const auto &item : boxs) {
         cont++;
-        print_progress(cont, boxs.size(), "Shape Checking");
+        print_progress(cont, boxs.size(), "Shape Checking...");
         sh::vec3 st = item.start;
         sh::vec3 en = item.end;
         double sx = st.x;
@@ -109,53 +109,30 @@ int main() {
                            std::max(sz, ez));
     }
     std::cout << std::endl;
+    std::vector<sh::box>().swap(boxs);
 
+    std::vector<sh::box> outboxs = boxs2;
+    int last_size = 0;
+    std::cout << "Shape Cptimisationing..." << std::endl;
+    while (last_size != outboxs.size()) {
+        last_size = outboxs.size();
+        std::vector<sh::box> bb = optimisation_boxs(outboxs);
+        std::vector<sh::box>().swap(outboxs);
+        outboxs = bb;
+        std::vector<sh::box>().swap(bb);
+    }
 
     nl::json jo;
+    for (const auto &item : outboxs) {
+        jo["shapes"].push_back({item.start.x, item.start.y, item.start.z, item.end.x, item.end.y, item.end.z});
+    }
+
     jo["version"] = 1;
     jo["date"] = time(nullptr);
     jo["meta"] = "VoxelShapeGenerater V" + version;
 
     for (const auto &item : paths) {
         jo["paths"].push_back(item);
-    }
-
-    std::vector<sh::box> outboxs;
-
-    for (int i = 0; i < boxs2.size(); ++i) {
-        bool nflag = false;
-        for (int k = 0; k < boxs2.size(); ++k) {
-            if (i != k) {
-                sh::vec3 st = boxs2[i].start;
-                sh::vec3 en = boxs2[i].end;
-                double sx = st.x;
-                double sy = st.y;
-                double sz = st.z;
-                double ex = en.x;
-                double ey = en.y;
-                double ez = en.z;
-
-                sh::vec3 kst = boxs2[k].start;
-                sh::vec3 ken = boxs2[k].end;
-                double ksx = kst.x;
-                double ksy = kst.y;
-                double ksz = kst.z;
-                double kex = ken.x;
-                double key = ken.y;
-                double kez = ken.z;
-
-                if (sx >= ksx && ex <= kex && sy >= ksy && ey <= key && sz >= ksz && ez <= kez) {
-                    nflag = true;
-                    break;
-                }
-            }
-        }
-        if (!nflag)
-            outboxs.push_back(boxs2[i]);
-    }
-
-    for (const auto &item : outboxs) {
-        jo["shapes"].push_back({item.start.x, item.start.y, item.start.z, item.end.x, item.end.y, item.end.z});
     }
 
     std::string op = "./output_shapes.json";
@@ -212,7 +189,7 @@ inline std::vector<sh::box> get_boxs_angled(sh::anglebox anglebox) {
 
     boxs.emplace_back(0, 0, 0, 0, 0, 0);
 
-    std::cout << w << ":" << h << ":" << d << std::endl;
+    //   std::cout << w << ":" << h << ":" << d << std::endl;
 
     return boxs;
 }
@@ -227,28 +204,30 @@ inline std::vector<sh::box> optimisation_boxs(std::vector<sh::box> boxs) {
     std::vector<int> remove_boxs;
 
     for (int i = 0; i < boxs.size(); ++i) {
-        for (int k = 0; k < boxs.size(); ++k) {
-            if (i != k && !ike::vector_contains(remove_boxs, k)) {
-                sh::vec3 st = boxs[i].start;
-                sh::vec3 en = boxs[i].end;
-                double sx = st.x;
-                double sy = st.y;
-                double sz = st.z;
-                double ex = en.x;
-                double ey = en.y;
-                double ez = en.z;
+        if (!ike::vector_contains(remove_boxs, i)) {
+            for (int k = 0; k < boxs.size(); ++k) {
+                if (i != k && !ike::vector_contains(remove_boxs, k)) {
+                    sh::vec3 st = boxs[i].start;
+                    sh::vec3 en = boxs[i].end;
+                    double sx = st.x;
+                    double sy = st.y;
+                    double sz = st.z;
+                    double ex = en.x;
+                    double ey = en.y;
+                    double ez = en.z;
 
-                sh::vec3 kst = boxs[k].start;
-                sh::vec3 ken = boxs[k].end;
-                double ksx = kst.x;
-                double ksy = kst.y;
-                double ksz = kst.z;
-                double kex = ken.x;
-                double key = ken.y;
-                double kez = ken.z;
-                if (sx >= ksx && ex <= kex && sy >= ksy && ey <= key && sz >= ksz && ez <= kez) {
-                    remove_boxs.push_back(k);
-                    break;
+                    sh::vec3 kst = boxs[k].start;
+                    sh::vec3 ken = boxs[k].end;
+                    double ksx = kst.x;
+                    double ksy = kst.y;
+                    double ksz = kst.z;
+                    double kex = ken.x;
+                    double key = ken.y;
+                    double kez = ken.z;
+                    if (sx >= ksx && ex <= kex && sy >= ksy && ey <= key && sz >= ksz && ez <= kez) {
+                        remove_boxs.push_back(i);
+                        break;
+                    }
                 }
             }
         }
